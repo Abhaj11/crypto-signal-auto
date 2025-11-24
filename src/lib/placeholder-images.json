@@ -1,0 +1,14 @@
+{
+  "hero": {
+    "src": "https://picsum.photos/seed/hero-bg/1200/800",
+    "hint": "abstract crypto"
+  },
+  "testimonial1": {
+    "src": "https://picsum.photos/seed/person1/100/100",
+    "hint": "professional person"
+  },
+  "testimonial2": {
+    "src": "https://picsum.photos/seed/person2/100/100",
+    "hint": "happy person"
+  }
+}
