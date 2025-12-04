@@ -75,11 +75,7 @@ function AuthForm() {
 
   const handleSignUp = async (values: z.infer<typeof signUpSchema>) => {
     setAuthError(null);
-    try {
-        await signUp(values.email, values.password);
-    } catch(e) {
-        // Error is already set in the useAuth hook
-    }
+    await signUp(values.email, values.password);
   };
 
   const handleSignIn = async (values: z.infer<typeof signInSchema>) => {

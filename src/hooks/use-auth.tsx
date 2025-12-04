@@ -12,9 +12,9 @@ import {
   updateProfile,
   updatePassword,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
 } from "firebase/auth";
-import { doc, onSnapshot, DocumentData } from "firebase/firestore";
+import { doc, onSnapshot, DocumentData, updateDoc } from "firebase/firestore";
 import {
   createContext,
   useContext,
@@ -23,6 +23,8 @@ import {
   ReactNode,
 } from "react";
 import { createUserProfileDocument } from '@/lib/user-profile';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 interface PortfolioItem {
   asset: string;
@@ -74,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (user) {
         // Log the ID token to the console upon successful login
         user.getIdToken(true).then(idToken => {
-            console.log("Here is your ID Token:", idToken);
+            // console.log("Here is your ID Token:", idToken);
         }).catch(error => {
             console.error("Error getting ID token:", error);
         });
@@ -116,12 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      createUserProfileDocument(userCredential.user);
+      await createUserProfileDocument(userCredential.user);
     } catch (err: any) {
-      setError(err.message);
-      throw err;
+        setError(err.message);
+        throw err; // Re-throw to be caught by the calling component if needed
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -157,15 +159,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const updateUserProfileName = async (name: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
-    try {
-      await updateProfile(user, { displayName: name });
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, { name });
-      // The onSnapshot listener will automatically update the userProfile state
-    } catch (err: any) {
-      console.error("Error updating profile name:", err);
-      throw err;
-    }
+    const userDocRef = doc(db, "users", user.uid);
+    const dataToUpdate = { name };
+
+    await updateProfile(user, { displayName: name });
+    
+    updateDoc(userDocRef, dataToUpdate)
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'update',
+            requestResourceData: dataToUpdate,
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+        // We don't re-throw here to prevent unhandled promise rejections in the UI,
+        // as the error is now handled globally by the listener.
+      });
   };
   
   const updateUserPassword = async (currentPass: string, newPass: string): Promise<void> => {

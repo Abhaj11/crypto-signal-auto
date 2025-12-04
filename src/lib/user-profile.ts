@@ -57,6 +57,8 @@ export function createUserProfileDocument(user: User) {
       requestResourceData: userData,
     } satisfies SecurityRuleContext);
     errorEmitter.emit('permission-error', permissionError);
+    // Re-throw the original server error so the calling function knows it failed
+    throw serverError;
   });
 }
 
@@ -70,14 +72,24 @@ export const updateApiKeys = async (userId: string, exchange: string, apiKey: st
 
     const encryptedApiKey = encryptData(apiKey);
     const encryptedApiSecret = encryptData(apiSecret);
-    
-    await updateDoc(userDocRef, {
+
+    const dataToUpdate = {
         [`apiKeys.${exchange}`]: {
             apiKey: encryptedApiKey,
             apiSecret: encryptedApiSecret,
             updatedAt: new Date(),
         }
-    });
+    };
+    
+    updateDoc(userDocRef, dataToUpdate)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: dataToUpdate,
+            } satisfies SecurityRuleContext);
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
 
 
@@ -89,9 +101,19 @@ export const deleteApiKeys = async (userId: string, exchange: string) => {
 
     const userDocRef = doc(db, "users", userId);
     
-    await updateDoc(userDocRef, {
+    const dataToUpdate = {
         [`apiKeys.${exchange}`]: {}
-    });
+    };
+
+    updateDoc(userDocRef, dataToUpdate)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: dataToUpdate,
+            } satisfies SecurityRuleContext);
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
 
 // Function to update auto-trade settings
@@ -101,11 +123,21 @@ export const updateAutoTradeSettings = async (userId: string, settings: { isAuto
     }
     const userDocRef = doc(db, "users", userId);
 
-    await updateDoc(userDocRef, {
+    const dataToUpdate = {
         isAutoTradeEnabled: settings.isAutoTradeEnabled,
         autoTradeAmount: Number(settings.autoTradeAmount),
         autoTradeRiskLevel: settings.autoTradeRiskLevel
-    });
+    };
+
+    updateDoc(userDocRef, dataToUpdate)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: dataToUpdate,
+            } satisfies SecurityRuleContext);
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
 
 // Function to update user subscription tier
@@ -114,9 +146,17 @@ export const updateUserSubscription = async (userId: string, tier: 'TRADER' | 'P
         throw new Error("Missing required parameters for updating subscription.");
     }
     const userDocRef = doc(db, "users", userId);
-    await updateDoc(userDocRef, {
-        subscriptionTier: tier
-    });
+    const dataToUpdate = { subscriptionTier: tier };
+
+    updateDoc(userDocRef, dataToUpdate)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: dataToUpdate,
+            } satisfies SecurityRuleContext);
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
 
 // **FIXED** Function to update user wallet balance
@@ -129,9 +169,16 @@ export const updateUserBalance = async (userId: string, amount: number) => {
     // This function now exclusively uses increment.
     // To add funds (deposit), pass a positive `amount`.
     // To deduct funds (payment or profit share), pass a negative `amount`.
-    await updateDoc(userDocRef, {
-        walletBalance: increment(amount)
-    });
+    const dataToUpdate = { walletBalance: increment(amount) };
+    updateDoc(userDocRef, dataToUpdate)
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: { walletBalance: `increment(${amount})`},
+            } satisfies SecurityRuleContext);
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
     
 

@@ -5,9 +5,19 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      // Allow users to read and write to their own document.
-      // This covers reading their profile and updating things like subscription status.
-      allow read, write: if request.auth.uid == userId;
+      // Allow users to read their own document after they are logged in.
+      allow read: if request.auth.uid == userId;
+
+      // Allow users to update their own document after they are logged in.
+      allow update: if request.auth.uid == userId;
+      
+      // Allow a user document to be created as long as the user's ID in the
+      // document data matches the authenticated user ID of the person creating it.
+      // This is necessary for the sign-up process.
+      allow create: if request.auth.uid == request.resource.data.uid;
+
+      // Do not allow client-side deletes.
+      allow delete: if false;
     }
 
     // Trades Collection
